@@ -1,69 +1,91 @@
 import React, { useState } from 'react'
 import './App.css'
-import { Icon, Button, Input, AutoComplete } from 'antd'
+import { Input, List } from 'antd'
+import { search } from '../../wiki-api'
 
-const Option = AutoComplete.Option
+const Search = Input.Search
 
 export default function App() {
-  const [data, setData] = useState([])
+  const [query, setQuery] = useState('')
+  const [request, setRequest] = useState(null)
 
-  function handleSearch(value) {
-    setData(value ? searchResult(value) : [])
+  async function handleSearch(query) {
+    setQuery(query)
+    if (!query) {
+      return setRequest({
+        data: null,
+        error: 'Campo de busca vazio'
+      })
+    }
+    setRequest({
+      data: null,
+      error: null
+    })
+    try {
+      let results = await search(query)
+      results = results[1].map((title, index) => ({
+        title,
+        description: results[2][index],
+        link: results[3][index]
+      }))
+      console.log(results)
+      setRequest({
+        data: results,
+        error: null
+      })
+    } catch (error) {
+      setRequest({
+        data: null,
+        error: error.message
+      })
+    }
   }
 
   return (
     <div className='App'>
-      <AutoComplete
+      <Search
         className='App-search-bar'
-        size='large'
-        dataSource={data.map(renderOption)}
-        onSelect={onSelect}
+        placeholder='Buscar na Wikipedia...'
         onSearch={handleSearch}
-        placeholder='Buscar na Wikpedia...'
-        optionLabelProp='text'
-      >
-        <Input
-          suffix={(
-            <Button className='App-search-button' size='large' type='primary'>
-              <Icon type='search' />
-            </Button>
-          )}
-        />
-      </AutoComplete>
+        size='large' enterButton
+      />
+    {request === null ? (
+      <p className='App-results'>Busque algum artigo na Wikipedia (Português).</p>
+    ) : (
+      request.error !== null ? (
+        <p className='App-results App-error'>{request.error}</p>
+      ) : (
+        request.data !== null && request.data.length === 0 ? (
+          <p className='App-results'>Nenhum resultado foi encontrado para a busca '{query}'</p>
+        ) : (
+          <List
+            className='App-results'
+            size='large'
+            bordered
+            loading={request.data === null && request.error === null}
+            dataSource={request.data !== null && request.data}
+            renderItem={item => <ListItem {...item} />}
+            />
+        )
+      )
+    )}
     </div>
   )
 }
 
-function onSelect(value) {
-  console.log('onSelect', value);
-}
-
-function getRandomInt(max, min = 0) {
-  return Math.floor(Math.random() * (max - min + 1)) + min; // eslint-disable-line no-mixed-operators
-}
-
-function searchResult(query) {
-  return (new Array(getRandomInt(5))).join('.').split('.')
-    .map((item, idx) => ({
-      query,
-      category: `${query}${idx}`,
-      count: getRandomInt(200, 100),
-    }));
-}
-
-function renderOption(item) {
+function ListItem({ title, description, link }) {
   return (
-    <Option key={item.category} text={item.category}>
-      {item.query} 在
-      <a
-        href={`https://s.taobao.com/search?q=${item.query}`}
-        target='_blank'
-        rel='noopener noreferrer'
-      >
-        {item.category}
-      </a>
-      区块中
-      <span className='global-search-item-count'>约 {item.count} 个结果</span>
-    </Option>
-  );
+    <List.Item className='App-ListItem'>
+    <a href={link} target='_blank' rel='noopener noreferrer'>
+        <p><strong>{title}</strong></p>
+        {description === '' ? null : (
+          description.length > 160 ? (
+            <p><small>{description.slice(0, 160)}...</small></p>
+          ) : (
+            <p><small>{description}</small></p>
+          )
+        )}
+    </a>
+  </List.Item>
+  )
 }
